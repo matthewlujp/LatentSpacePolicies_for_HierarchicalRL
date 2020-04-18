@@ -23,7 +23,7 @@ class LSPHierarchicalRL(Agent):
     def __init__(self, observation_space, action_space, subpolicy_coupling_layer_num=2,
             subpolicy_coupling_layer_nn_hidden_layer_num=1, subpolicy_coupling_layer_nn_hidden_layer_size=256,
             prior=None, gamma=0.99, target_smoothing_rate=0.01, alpha=0.2, target_update_interval=1,
-            critic_hidden_layer_num=128, critic_hidden_layer_size=1, learning_rate=3.0*10e-4, device='cpu'):
+            critic_hidden_layer_num=1, critic_hidden_layer_size=128, learning_rate=3.0*10e-4, device='cpu'):
         """
         Params
         ---
@@ -96,7 +96,6 @@ class LSPHierarchicalRL(Agent):
         hh = hh.to(self._device)
 
         h, log_det_J = self._subpolicies[-1](hh, obs)
-        
         log_p = log_p_hh + log_det_J
         return h, log_p
 
@@ -107,9 +106,9 @@ class LSPHierarchicalRL(Agent):
         ---
         qf1_loss, qf2_loss, policy_loss, alpha_loss, self._alpha
         """
-        observations, actions, rewards, next_observations, terminations = batch_data
+        observations, hs, rewards, next_observations, terminations = batch_data
         observations = torch.FloatTensor(observations).to(self._device)
-        hs = torch.FloatTensor(actions).to(self._device)
+        hs = torch.FloatTensor(hs).to(self._device)
         rewards = torch.FloatTensor(rewards).to(self._device)
         next_observations = torch.FloatTensor(next_observations).to(self._device)
         terminations = torch.FloatTensor(terminations).to(self._device)

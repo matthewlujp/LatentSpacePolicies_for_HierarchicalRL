@@ -130,7 +130,7 @@ class BijectiveTransform(nn.Module):
 
 
 class QNetwork(nn.Module):
-    def __init__(self, obs_size, action_size, hidden_layer_num=2, hidden_layer_size=128):
+    def __init__(self, obs_size, action_size, hidden_layer_num=1, hidden_layer_size=128):
         super().__init__()
         self._qnet_1 = NN(obs_size + action_size, 1, hidden_layer_num, hidden_layer_size, torch.relu)
         self._qnet_2 = NN(obs_size + action_size, 1, hidden_layer_num, hidden_layer_size, torch.relu)
