@@ -25,10 +25,6 @@ if torch.cuda.is_available():
 
 
 
-
-
-
-
 def train(config_filepath, save_dir, device, visualize_interval):
     conf = load_toml_config(config_filepath)
     data_dir, log_dir = create_save_dir(save_dir)
@@ -221,7 +217,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Test trying a walker.')
     parser.add_argument('--config', default='default_config.toml', help='Config file path')
     parser.add_argument('--save-dir', default=os.path.join('results', 'test'), help='Save directory')
-    parser.add_argument('--random-policy', action='store_true', help='Do not update policy and keep selecting random action.')
     parser.add_argument('--visualize-interval', default=25, type=int, help='Interval to draw graphs of metrics.')
     parser.add_argument('--device', default='cpu', choices={'cpu', 'cuda:0', 'cuda:1', 'cuda:2', 'cuda:3'}, help='Device for computation.')
     parser.add_argument('-e', '--eval', action='store_true', help='Run model evaluation.')

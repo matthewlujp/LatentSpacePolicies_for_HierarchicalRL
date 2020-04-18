@@ -57,7 +57,7 @@ class BijectiveTransform(nn.Module):
         self._condition_vector_size = condition_vector_size
         self._layer_num = layer_num
         m = torch.cat([torch.ones(v_size//2), torch.zeros(v_size - v_size//2)])
-        self._masks = [nn.Parameter(m.clone(), requires_grad=False) if i%2==0 else nn.Parameter((1. - m).clone(), requires_grad=False) for i in range(self._layer_num)]
+        self.register_buffer("_masks", torch.stack([m.clone() if i%2==0 else 1. - m.clone() for i in range(self._layer_num)]))
         self._s = nn.ModuleList([NN(v_size + condition_vector_size, v_size, scale_net_hidden_layer_num, scale_net_hidden_layer_size, torch.relu, torch.tanh, True) for _ in range(layer_num)])
         self._t = nn.ModuleList([NN(v_size + condition_vector_size, v_size, translate_net_hidden_layer_num, translate_net_hidden_layer_size, torch.relu) for _ in range(layer_num)])
         self._prior = Normal(torch.zeros(v_size), torch.ones(v_size))  # N(0, 1)
