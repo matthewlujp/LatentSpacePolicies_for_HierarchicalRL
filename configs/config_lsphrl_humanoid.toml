@@ -15,8 +15,6 @@ policy_switch_samples = [10e6]
 
 [agent]
 subpolicy_coupling_layer_num = 2
-subpolicy_coupling_layer_nn_hidden_layer_num = 1
-subpolicy_coupling_layer_nn_hidden_layer_size = 256
 gamma = 0.99
 target_smoothing_rate = 0.01
 alpha = 0.2
