@@ -21,9 +21,8 @@ class LSPHierarchicalRL(Agent):
     ]
 
     def __init__(self, observation_space, action_space, subpolicy_coupling_layer_num=2,
-            subpolicy_coupling_layer_nn_hidden_layer_num=1, subpolicy_coupling_layer_nn_hidden_layer_size=256,
             prior=None, gamma=0.99, target_smoothing_rate=0.01, alpha=0.2, target_update_interval=1,
-            critic_hidden_layer_num=1, critic_hidden_layer_size=128, learning_rate=3.0*10e-4, device='cpu'):
+            critic_hidden_layer_num=2, critic_hidden_layer_size=128, learning_rate=3.0*10e-4, device='cpu'):
         """
         Params
         ---
@@ -41,8 +40,6 @@ class LSPHierarchicalRL(Agent):
         self._prior = prior if prior is not None else MultivariateNormal(torch.ones(self._action_size), torch.eye(self._action_size))
 
         self._subpolicy_coupling_layer_num = subpolicy_coupling_layer_num
-        self._subpolicy_coupling_layer_nn_hidden_layer_num = subpolicy_coupling_layer_nn_hidden_layer_num
-        self._subpolicy_coupling_layer_nn_hidden_layer_size = subpolicy_coupling_layer_nn_hidden_layer_size
         self._subpolicies = []
 
         self._critic_hidden_layer_num = critic_hidden_layer_num

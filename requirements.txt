@@ -9,3 +9,5 @@ plotly
 tqdm==4.45.0
 toml
 matplotlib
+notebook
+sklearn

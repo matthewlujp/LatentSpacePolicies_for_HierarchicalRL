@@ -20,7 +20,7 @@ class NN(nn.Module):
     def __init__(self, in_size, out_size, hidden_layer_num, hidden_layer_size, activation_func, output_func=None, learn_output_scale=False):
         super().__init__()
         self._layers = [nn.Linear(in_size, hidden_layer_size)]
-        self._layers += [nn.Linear(hidden_layer_size, hidden_layer_size) for _ in range(hidden_layer_num)] 
+        self._layers += [nn.Linear(hidden_layer_size, hidden_layer_size) for _ in range(hidden_layer_num-1)] 
         self._layers += [nn.Linear(hidden_layer_size, out_size)]
         self._layers = nn.ModuleList(self._layers)
 
@@ -130,7 +130,7 @@ class BijectiveTransform(nn.Module):
 
 
 class QNetwork(nn.Module):
-    def __init__(self, obs_size, action_size, hidden_layer_num=1, hidden_layer_size=128):
+    def __init__(self, obs_size, action_size, hidden_layer_num=2, hidden_layer_size=128):
         super().__init__()
         self._qnet_1 = NN(obs_size + action_size, 1, hidden_layer_num, hidden_layer_size, torch.relu)
         self._qnet_2 = NN(obs_size + action_size, 1, hidden_layer_num, hidden_layer_size, torch.relu)
