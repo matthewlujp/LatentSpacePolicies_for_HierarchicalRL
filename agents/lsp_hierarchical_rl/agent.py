@@ -96,11 +96,7 @@ class LSPHierarchicalRL(Agent):
         hh = hh.to(self._device)
 
         h, log_det_J = self._subpolicies[-1](hh, obs)
-        # check TODO: remove
-        hh_, log_det_J_ = self._subpolicies[-1].inverse(h, obs)
-        assert ((hh - hh_).abs() < 1e-3).all(), "hh\n{}\nhh_\n{}".format(hh, hh_)
-        assert ((log_det_J - log_det_J_) < 1e-3).all(), "log_det_J\n{}\nlog_det_J_\n{}".format(log_det_J, log_det_J_)
-
+        
         log_p = log_p_hh + log_det_J
         return h, log_p
 
