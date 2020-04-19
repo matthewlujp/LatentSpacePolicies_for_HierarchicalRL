@@ -69,8 +69,9 @@ class LSPHierarchicalRL(Agent):
 
         obs_t = torch.FloatTensor(obs).unsqueeze(0).to(self._device)
         h = self._prior.sample((1,)).to(self._device) if not eval else torch.zeros(1, self._action_size).to(self._device)
-        for sp in reversed(self._subpolicies):
-            h, _ = sp(h, obs_t)  # deterministic calculation
+        with torch.no_grad():
+            for sp in reversed(self._subpolicies):
+                h, _ = sp(h, obs_t)  # deterministic calculation
         a = h.squeeze(0)
         return a.detach().cpu().numpy()
         
@@ -84,11 +85,13 @@ class LSPHierarchicalRL(Agent):
         if random_latent:
             hh = self._prior.sample().unsqueeze(0)
         else:
-            hh, _ = self._select_latent_and_log_prob(obs_t)
+            with torch.no_grad():
+                hh, _ = self._select_latent_and_log_prob(obs_t)
 
-        h = hh
-        for sp in reversed(self._subpolicies[:-1]):
-            h, _ = sp(h, obs_t)  # deterministic calculation
+        with torch.no_grad():
+            h = hh
+            for sp in reversed(self._subpolicies[:-1]):
+                h, _ = sp(h, obs_t)  # deterministic calculation
         a = h.squeeze(0)
         return hh.squeeze(0).detach().cpu().numpy(), a.detach().cpu().numpy()
     
@@ -124,9 +127,9 @@ class LSPHierarchicalRL(Agent):
         terminations = torch.FloatTensor(terminations).to(self._device)
 
         with torch.no_grad():
-            next_obs_hs, next_obs_log_ps = self._select_latent_and_log_prob(next_observations)
+            next_obs_hs, next_obs_hs_log_ps = self._select_latent_and_log_prob(next_observations)
             qf1_next_target, qf2_next_target = self._critic_target(next_observations, next_obs_hs)
-            min_qf_next_target = torch.min(qf1_next_target, qf2_next_target) - self._alpha * next_obs_log_ps.unsqueeze(1)
+            min_qf_next_target = torch.min(qf1_next_target, qf2_next_target) - self._alpha * next_obs_hs_log_ps.unsqueeze(1)
             next_q_values = rewards + (1 - terminations) * self._gamma * (min_qf_next_target)
 
         # Calculate critic loss
@@ -141,10 +144,13 @@ class LSPHierarchicalRL(Agent):
         policy_loss = - (min_qf_pi - self._alpha * log_ps_).mean() # Jπ = 𝔼st∼D,εt∼N[α * logπ(f(εt;st)|st) − Q(st,f(εt;st))]
 
         # Calculate alpha loss
-        alpha_loss = (self._log_alpha * (- log_ps_ - self._target_entropy).detach()).mean()
+        alpha_loss = (self._log_alpha * (- log_ps_.detach() - self._target_entropy)).mean()
 
         self._critic_optim.zero_grad()
         qf1_loss.backward()
+        self._critic_optim.step()
+
+        self._critic_optim.zero_grad()
         qf2_loss.backward()
         self._critic_optim.step()
         
