@@ -62,51 +62,50 @@ class LSPHierarchicalRL(Agent):
         self._log_alpha = torch.ones(1, requires_grad=True, device=self._device)
         self._alpha_optim = Adam([self._log_alpha], lr=self._learning_rate)
 
-    def select_action(self, obs: np.ndarray, eval=False):
-        """Select an action based on observation by propergating hidden variables.
+    def select_action(self, obs: np.ndarray, eval=False, random=False):
+        """Select an abstract action using a subpolicy in the higher hierarchy based on observation.
+        post_process_action method should be called before passing the returned action to an environment.
         """
         assert obs.shape == (self._observation_size,), "expected {}, got {}".format((self._observation_size,), obs.shape)
-
-        obs_t = torch.FloatTensor(obs).unsqueeze(0).to(self._device)
-        h = self._prior.sample((1,)).to(self._device) if not eval else torch.zeros(1, self._action_size).to(self._device)
+        obs = torch.FloatTensor(obs).unsqueeze(0).to(self._device)
         with torch.no_grad():
-            for sp in reversed(self._subpolicies):
-                h, _ = sp(h, obs_t)  # deterministic calculation
-        a = h.squeeze(0)
-        return a.detach().cpu().numpy()
-        
-    def select_latent_and_action(self, obs: np.ndarray, random_latent=False):
-        """Return both selected latent variable and action.
-        If random_latent is True, the highest policy is replaced with Gaussina distribution.
+            h, _ = self._select_latent_and_log_prob(obs, eval=eval, skip_subpolicy=random)
+        return h.squeeze(0).detach().cpu().numpy()
+
+    def post_process_action(self, obs: np.ndarray, h: np.ndarray):
+        """Get an actual action from a latent variable.
         """
-        assert obs.shape == (self._observation_size,), "expected {}, got {}".format((self._observation_size,), obs.shape)
-
-        obs_t = torch.FloatTensor(obs).unsqueeze(0).to(self._device)
-        if random_latent:
-            hh = self._prior.sample().unsqueeze(0)
-        else:
-            with torch.no_grad():
-                hh, _ = self._select_latent_and_log_prob(obs_t)
-
+        h = torch.FloatTensor(h).unsqueeze(0).to(self._device)
+        obs = torch.FloatTensor(obs).unsqueeze(0).to(self._device)
         with torch.no_grad():
-            h = hh
             for sp in reversed(self._subpolicies[:-1]):
-                h, _ = sp(h, obs_t)  # deterministic calculation
-        a = h.squeeze(0)
-        return hh.squeeze(0).detach().cpu().numpy(), a.detach().cpu().numpy()
-    
-    def _select_latent_and_log_prob(self, obs: torch.FloatTensor):
+                h, _ = sp(h, obs)  # deterministic calculation
+        return h.squeeze(0).detach().cpu().numpy()
+        
+    def _select_latent_and_log_prob(self, obs: torch.FloatTensor, eval=False, skip_subpolicy=False):
         """Select latent variable using a subpolicy being trained and return it with its log prob.
-        Returns
-            h_l ([batch_size, action_size])
-            log_p ([batch_size])
+        Params
+        ---
+        obs: ([batch_size, observation_size])
+
+        Return
+        ---
+        h_l: ([batch_size, action_size])
+        log_p: ([batch_size])
         """
         N = obs.size(0)
         assert obs.size() == torch.Size([N, self._observation_size])
 
-        hh = self._prior.sample((N, ))
-        log_p_hh = self._prior.log_prob(hh).to(self._device)
-        hh = hh.to(self._device)
+        if not eval:
+            hh = self._prior.sample((N, ))
+            log_p_hh = self._prior.log_prob(hh).to(self._device)
+            hh = hh.to(self._device)
+        else:
+            hh = torch.zeros(N, self._action_size).to(self._device)  # deterministic if eval
+            log_p_hh = 0
+
+        if skip_subpolicy:
+            return hh, log_p_hh
 
         h, log_det_J = self._subpolicies[-1](hh, obs)
         log_p = log_p_hh + log_det_J

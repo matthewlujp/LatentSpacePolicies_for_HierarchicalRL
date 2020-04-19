@@ -51,7 +51,7 @@ class ReplayBuffer:
     def __len__(self):
         return self.capacity if self.full else self._idx
 
-    def sample(self, batch_size, replace=False):
+    def sample(self, batch_size, replace=True):
         """Return a tuple of batch data.
         batch_s, batch_a, batch_r, batch_s', batch_t
         """

@@ -4,7 +4,11 @@ from abc import ABCMeta, abstractclassmethod
 
 class Agent(metaclass=ABCMeta):
     @abstractclassmethod
-    def select_action(self, state, eval=False):
+    def select_action(self, state, eval=False, random=False):
+        pass
+
+    @abstractclassmethod
+    def post_process_action(self, state, action):
         pass
 
     @abstractclassmethod

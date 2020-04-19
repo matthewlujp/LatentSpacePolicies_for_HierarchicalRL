@@ -52,13 +52,16 @@ class SAC(Agent):
         self._observation_shape = observation_space.shape
         self._action_shape = action_space.shape
 
-    def select_action(self, state, eval=False):
+    def select_action(self, state, eval=False, random=False):
         state = torch.FloatTensor(state).to(self.device).unsqueeze(0)
         if eval == False:
             action, _, _ = self.policy.sample(state)
         else:
             _, _, action = self.policy.sample(state)
-        return action.detach().cpu().numpy()[0]
+        return action.detach().cpu().numpy().squeeze(0)
+
+    def post_process_action(self, obs, a):
+        return a  # Do nothing
 
     def update_parameters(self, batch_data, total_updates):
         """

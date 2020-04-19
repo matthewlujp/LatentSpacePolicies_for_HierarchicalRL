@@ -92,12 +92,13 @@ def train(config_filepath, save_dir, device, visualize_interval):
 
         for t in range(conf.horizon):
             if total_collected_samples <= conf.random_sample_num:  # Select random actions at the begining of training.
-                a = env.action_space.sample()
-                h = a
+                h = env.action_space.sample()
             elif memory.step <= conf.random_sample_num:  # Select actions from random latent variable soon after inserting a new subpolicy.
-                h, a = agent.select_latent_and_action(o, random_latent=True)
+                h = agent.select_action(o, random=True)
             else:
-                h, a = agent.select_latent_and_action(o)
+                h = agent.select_action(o)
+
+            a = agent.post_process_action(o, h)  # Convert abstract action h to actual action a
 
             o_next, r, done, _  = env.step(a)
             total_collected_samples += 1
@@ -160,7 +161,8 @@ def train(config_filepath, save_dir, device, visualize_interval):
                 episodic_reward = 0
                 obs = env.reset()
                 for t in range(conf.horizon):
-                    a = agent.select_action(obs, eval=True)
+                    h = agent.select_action(obs, eval=True)
+                    a = agent.post_process_action(o, h)
                     obs_next, r, done, _  = env.step(a)
                     episodic_reward += r
                     obs = obs_next
@@ -201,7 +203,8 @@ def evaluate(config_filepath: str, model_filepath: str, render: bool):
     episode_reward = 0
     t = 0
     while not done:
-        a = agent.select_action(o, eval=True)
+        h = agent.select_action(o, eval=True)
+        a = agent.post_process_action(o, h)
         o_next, r, done, _ = env.step(a)
         episode_reward += r
         o = o_next
