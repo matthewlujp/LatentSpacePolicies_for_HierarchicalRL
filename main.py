@@ -90,15 +90,18 @@ def train(config_filepath, save_dir, device, visualize_interval):
         o = env.reset()
 
         for t in range(conf.horizon):
-            if memory.step <= conf.random_sample_num:
+            if total_collected_samples <= conf.random_sample_num:
                 a = env.action_space.sample()
+                h = a
+            elif memory.step <= conf.random_sample_num:
+                h, a = agent.select_latent_and_action(o, random_latent=True)
             else:
-                a = agent.select_action(o)
+                h, a = agent.select_latent_and_action(o)
 
             o_next, r, done, _  = env.step(a)
             total_collected_samples += 1
             episodic_reward += r
-            memory.push(o, a, r, o_next, done)
+            memory.push(o, h, r, o_next, done)
             o = o_next
 
             if memory.step > conf.random_sample_num:

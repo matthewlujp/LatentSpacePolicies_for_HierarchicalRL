@@ -69,21 +69,34 @@ class LSPHierarchicalRL(Agent):
 
         obs_t = torch.FloatTensor(obs).unsqueeze(0).to(self._device)
         h = self._prior.sample((1,)).to(self._device) if not eval else torch.zeros(1, self._action_size).to(self._device)
-        for sp in reversed(self._subpolicies[:-1]):
+        for sp in reversed(self._subpolicies):
             h, _ = sp(h, obs_t)  # deterministic calculation
         a = h.squeeze(0)
         return a.detach().cpu().numpy()
+        
+    def select_latent_and_action(self, obs: np.ndarray, random_latent=False):
+        """Return both selected latent variable and action.
+        If random_latent is True, the highest policy is replaced with Gaussina distribution.
+        """
+        assert obs.shape == (self._observation_size,), "expected {}, got {}".format((self._observation_size,), obs.shape)
+
+        obs_t = torch.FloatTensor(obs).unsqueeze(0).to(self._device)
+        if random_latent:
+            hh = self._prior.sample().unsqueeze(0)
+        else:
+            hh, _ = self._select_latent_and_log_prob(obs_t)
+
+        h = hh
+        for sp in reversed(self._subpolicies[:-1]):
+            h, _ = sp(h, obs_t)  # deterministic calculation
+        a = h.squeeze(0)
+        return hh.squeeze(0).detach().cpu().numpy(), a.detach().cpu().numpy()
     
-    def select_latent_variable(self, obs: torch.FloatTensor):
+    def _select_latent_and_log_prob(self, obs: torch.FloatTensor):
         """Select latent variable using a subpolicy being trained and return it with its log prob.
-
-        Params
-        ---
-        obs: ([batch_size, observation_size])
-
-        Return
-        ---
-        h_l ([batch_size, action_size]), log_p ([batch_size])
+        Returns
+            h_l ([batch_size, action_size])
+            log_p ([batch_size])
         """
         N = obs.size(0)
         assert obs.size() == torch.Size([N, self._observation_size])
@@ -111,7 +124,7 @@ class LSPHierarchicalRL(Agent):
         terminations = torch.FloatTensor(terminations).to(self._device)
 
         with torch.no_grad():
-            next_obs_hs, next_obs_log_ps = self.select_latent_variable(next_observations)
+            next_obs_hs, next_obs_log_ps = self._select_latent_and_log_prob(next_observations)
             qf1_next_target, qf2_next_target = self._critic_target(next_observations, next_obs_hs)
             min_qf_next_target = torch.min(qf1_next_target, qf2_next_target) - self._alpha * next_obs_log_ps.unsqueeze(1)
             next_q_values = rewards + (1 - terminations) * self._gamma * (min_qf_next_target)
@@ -122,7 +135,7 @@ class LSPHierarchicalRL(Agent):
         qf2_loss = F.mse_loss(qf2, next_q_values) # JQ = 𝔼(st,at)~D[0.5(Q1(st,at) - r(st,at) - γ(𝔼st+1~p[V(st+1)]))^2]
 
         # Calculate subpolicy loss
-        hs_, log_ps_ = self.select_latent_variable(observations)
+        hs_, log_ps_ = self._select_latent_and_log_prob(observations)
         qf1_pi, qf2_pi = self._critic(observations, hs_)
         min_qf_pi = torch.min(qf1_pi, qf2_pi)
         policy_loss = - (min_qf_pi - self._alpha * log_ps_).mean() # Jπ = 𝔼st∼D,εt∼N[α * logπ(f(εt;st)|st) − Q(st,f(εt;st))]

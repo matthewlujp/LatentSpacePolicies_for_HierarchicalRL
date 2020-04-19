@@ -9,7 +9,7 @@ checkpoint_interval = 10
 checkpoint = ''
 test_interval = 50
 test_times = 5
-policy_switch_samples = [10e6]
+policy_switch_samples = [1e5]
 
 
 
