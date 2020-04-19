@@ -5,6 +5,8 @@ from torch.distributions import MultivariateNormal
 import numpy as np
 
 
+EPSILON = 1e-5
+
 
 # Initialize Policy weights
 def weights_init_(m):
@@ -71,7 +73,8 @@ class BijectiveTransform(nn.Module):
 
         Return
         ---
-        z, log det(\frac{\partial f}{\partial x})
+        z, log_det_J
+        where log_det_J = log det(\frac{\partial f}{\partial x})
         """
         batch_size = x.size(0)
         assert x.size() == torch.Size([batch_size, self._v_size]), x.size()
@@ -91,13 +94,18 @@ class BijectiveTransform(nn.Module):
 
     def generate(self, z, cond=None):
         """Generation x = f^-1(z)
+
+        Return
+        ---
+        x, log_det_inv_J
+        where log_det_inv_J = log det(\frac{\partial f^{-1}}{\partial z})
         """
         batch_size = z.size(0)
         assert z.size() == torch.Size([batch_size, self._v_size]), z.size()
         if self._condition_vector_size > 0:
             cond.size() == torch.Size([batch_size, self._condition_vector_size]), cond.size()
 
-        log_det_J = 0
+        log_det_inv_J = 0
         x = z
         for i in reversed(range(self._layer_num)):
             mask = self._masks[i]
@@ -105,8 +113,8 @@ class BijectiveTransform(nn.Module):
             s = self._s[i](x_) * (1. - mask)
             t = self._t[i](x_) * (1. - mask)
             x = mask * x + ((1. - mask) * x - t) * (-s).exp()
-            log_det_J += self._calc_log_determinant(-s)
-        return x, log_det_J
+            log_det_inv_J += self._calc_log_determinant(-s)
+        return x, log_det_inv_J
 
     def calc_log_likelihood(self, x_batch, cond_batch=None):
         """Maxmiize log p(x) = log p(f(x)) + log | det(\frac{\partial f}{\partial x}) |
@@ -144,10 +152,17 @@ class QNetwork(nn.Module):
 
 
 class Policy(nn.Module):
-    def __init__(self, obs_size, action_size, obs_embedding_hidden_layer_num=2, obs_embedding_hidden_layer_size=128):
+    def __init__(self, obs_size, action_size, obs_embedding_hidden_layer_num=2, obs_embedding_hidden_layer_size=128,
+            action_low=None, action_high=None):
         super().__init__()
         self._observation_size = obs_size
         self._action_size = action_size
+        self._action_low, self._action_high = action_low, action_high
+
+        if self._action_high is not None:
+            self._action_scaler = Scaler(self._action_low, self._action_high)
+        else:
+            self._action_scaler = None
 
         obs_embedding_size = 2 * action_size
         self._f = BijectiveTransform(action_size, 2, 1, action_size, 1, action_size, obs_embedding_size) # following the configurations in the original paper
@@ -161,9 +176,16 @@ class Policy(nn.Module):
         assert hh.size() == torch.Size([N, self._action_size]), "expected {}, got {}".format((N, self._action_size), hh.size())
         assert obs.size() == torch.Size([N, self._observation_size]), "expected {}, got {}".format((N, self._observation_size), obs.size())
 
+        log_det = 0
         obs_embedding = self._embed_nn(obs)
         h, log_det_inv_J = self._f.generate(hh, obs_embedding)
-        return h, -log_det_inv_J
+        log_det += (-log_det_inv_J)  # a <- f^{-1}(h), p(a) = p(h) det df/da = p(h) ( det df^{-1}/dh )^{-1}
+        # Convert range if needed
+        if self._action_scaler:
+            h, log_det_scale = self._action_scaler(h)
+            log_det += (- log_det_scale)  # a <- f(u), p(a) = p(u) det df^{-1}/da = p(u) ( det df/du )^{-1}
+
+        return h, log_det
 
     def inverse(self, h, obs):
         """Just for check.
@@ -172,11 +194,56 @@ class Policy(nn.Module):
         assert obs.size() == torch.Size([N, self._observation_size]), obs.size()
         assert h.size() == torch.Size([N, self._action_size]), hh.size()
 
+        log_det = 0
+        if self._action_scaler:
+            h, log_det_inv_scale = self._action_scaler.inverse(h)
+            log_det += (- log_det_inv_scale)  # u <- f^{-1}(a), p(u) = p(a) det df/du = p(u) ( det df^{-1}/da )^{-1}
+
         obs_embedding = self._embed_nn(obs)
         hh, log_det_J = self._f.infer(h, obs_embedding)
-        return hh, log_det_J
+        log_det += (- log_det_J)  # h <- f(a), p(h) = p(a) det df^{-1}/dh = p(a) ( det df/da )^{-1}
+        return hh, log_det
 
 
 
+class Scaler(nn.Module):
+    """Convert unlimited action into a variable with range.
+    a = f(u) where $u \in [-inf, inf]$ -> $a \in [low, high]$
+    """
+    def __init__(self, action_space_low: np.ndarray, action_space_high: np.ndarray):
+        super().__init__()
+        # a = w tanh(u) + m
+        self.register_buffer("_m", torch.FloatTensor((action_space_low + action_space_high) / 2.))
+        self.register_buffer("_w", torch.FloatTensor((action_space_high - action_space_low) / 2.))
+        assert (self._w >= 0).all(), self._w
 
-    
+    def forward(self, x):
+        """Convert x -> a
+        Return
+        ----
+        a
+        log_det_J = log det diag{ w * (1 - tanh^2(u)) }
+        """
+        u = torch.tanh(x)
+        a = self._m + self._w * u
+        log_det_J = torch.log(self._w * (1. - u.pow(2)) + EPSILON).sum(dim=1)
+        return a, log_det_J
+
+    def inverse(self, a):
+        """Convert a -> x
+        Return
+        ---
+        a
+        log_det_inv_J = - log det diag{ w * (1 - tanh^2(u)) }
+        """
+        u = (a - self._m) / self._w
+        x = _arctanh(u)
+        log_det_inv_J = - torch.log(self._w * (1. - u.pow(2)) + EPSILON).sum(dim=1)
+        return x, log_det_inv_J
+
+
+
+def _arctanh(y):
+    assert -1 < y < 1, y
+    return .5 * (torch.log(y+1) - torch.log(1-y))
+        

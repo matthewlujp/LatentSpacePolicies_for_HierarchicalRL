@@ -46,7 +46,7 @@ class LSPHierarchicalRL(Agent):
         self._critic_hidden_layer_size = critic_hidden_layer_size
 
         # Prepare a policy
-        subpolicy = Policy(self._observation_size, self._action_size, 2, 128).to(self._device)
+        subpolicy = Policy(self._observation_size, self._action_size, 2, 128, action_low=action_space.low, action_high=action_space.high).to(self._device)
         self._subpolicies.append(subpolicy)
         self._policy_optim = Adam(subpolicy.parameters(), lr=self._learning_rate)
 
