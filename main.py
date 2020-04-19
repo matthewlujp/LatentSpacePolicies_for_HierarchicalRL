@@ -88,12 +88,13 @@ def train(config_filepath, save_dir, device, visualize_interval):
     for episode in pbar:
         episodic_reward = 0
         o = env.reset()
+        q1_loss, q2_loss, policy_loss, alpha_loss, alpha = None, None, None, None, None
 
         for t in range(conf.horizon):
-            if total_collected_samples <= conf.random_sample_num:
+            if total_collected_samples <= conf.random_sample_num:  # Select random actions at the begining of training.
                 a = env.action_space.sample()
                 h = a
-            elif memory.step <= conf.random_sample_num:
+            elif memory.step <= conf.random_sample_num:  # Select actions from random latent variable soon after inserting a new subpolicy.
                 h, a = agent.select_latent_and_action(o, random_latent=True)
             else:
                 h, a = agent.select_latent_and_action(o)
@@ -107,13 +108,14 @@ def train(config_filepath, save_dir, device, visualize_interval):
             if memory.step > conf.random_sample_num:
                 # Update agent
                 batch_data = memory.sample(conf.agent_update_batch_size)
-                agent.update_parameters(batch_data, agent_update_count)
+                q1_loss, q2_loss, policy_loss, alpha_loss, alpha = agent.update_parameters(batch_data, agent_update_count)
+                agent_update_count += 1
 
             if done:
                 break
 
+        # Describe and save episodic metrics
         reward_moving_avg = (1. - MOVING_AVG_COEF) * reward_moving_avg + MOVING_AVG_COEF * episodic_reward if reward_moving_avg else episodic_reward
-
         pbar.set_description("EPISODE {} (total samples {}, subpolicy samples {}) --- Step {}, Reward {:.1f} (avg {:.1f})".format(episode, total_collected_samples, memory.step, t, episodic_reward, reward_moving_avg))
         metrics['episode'].append(episode)    
         metrics['reward'].append(episodic_reward)
@@ -126,17 +128,12 @@ def train(config_filepath, save_dir, device, visualize_interval):
             lineplot(metrics['episode'][-len(reward_avg):], reward_avg, 'AVG_REWARD', log_dir)
             lineplot(metrics['collected_total_samples'][-len(metrics['reward']):], metrics['reward'], 'SAMPLE-REWARD', log_dir, xaxis='sample')
 
-        # Update agent
-        if memory.step >= conf.random_sample_num:
-            batch_data = memory.sample(conf.agent_update_batch_size)
-            q1_loss, q2_loss, policy_loss, alpha_loss, alpha = agent.update_parameters(batch_data, agent_update_count)
-            agent_update_count += 1
-
+        # Save metrics for agent update
+        if q1_loss is not None:
             metrics['q_loss'].append(np.mean([q1_loss, q2_loss]))
             metrics['policy_loss'].append(policy_loss)
             metrics['alpha_loss'].append(alpha_loss)
             metrics['alpha'].append(alpha)
-
             if episode % visualize_interval == 0:
                 lineplot(metrics['episode'][-len(metrics['q_loss']):], metrics['q_loss'], 'Q_LOSS', log_dir)
                 lineplot(metrics['episode'][-len(metrics['policy_loss']):], metrics['policy_loss'], 'POLICY_LOSS', log_dir)
@@ -146,7 +143,7 @@ def train(config_filepath, save_dir, device, visualize_interval):
 
 
         # Insert new subpolicy layer and reset memory if a specific amount of samples is collected
-        if policy_switch_samples and len(policy_switch_samples) > 0 and memory.step >= policy_switch_samples[0]:
+        if policy_switch_samples and len(policy_switch_samples) > 0 and total_collected_samples >= policy_switch_samples[0]:
             print("----------------------\nInser new policy\n----------------------")
             agent.insert_subpolicy()
             memory.reset()
