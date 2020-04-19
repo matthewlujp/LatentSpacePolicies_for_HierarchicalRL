@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 import torch.nn.functional as F
-from torch.distributions import Normal
+from torch.distributions import MultivariateNormal
 import numpy as np
 
 
@@ -45,7 +45,7 @@ class BijectiveTransform(nn.Module):
     """Implementation fo bijective transformation in Real NVP.
     """
     def __init__(self, v_size, layer_num, scale_net_hidden_layer_num=1, scale_net_hidden_layer_size=256, 
-            translate_net_hidden_layer_num=1, translate_net_hidden_layer_size=265, condition_vector_size=0):
+            translate_net_hidden_layer_num=1, translate_net_hidden_layer_size=256, condition_vector_size=0):
         """
         Parames
         ---
@@ -60,7 +60,7 @@ class BijectiveTransform(nn.Module):
         self.register_buffer("_masks", torch.stack([m.clone() if i%2==0 else 1. - m.clone() for i in range(self._layer_num)]))
         self._s = nn.ModuleList([NN(v_size + condition_vector_size, v_size, scale_net_hidden_layer_num, scale_net_hidden_layer_size, torch.relu, torch.tanh, True) for _ in range(layer_num)])
         self._t = nn.ModuleList([NN(v_size + condition_vector_size, v_size, translate_net_hidden_layer_num, translate_net_hidden_layer_size, torch.relu) for _ in range(layer_num)])
-        self._prior = Normal(torch.zeros(v_size), torch.ones(v_size))  # N(0, 1)
+        self._prior = MultivariateNormal(torch.zeros(v_size), torch.eye(v_size))  # N(0, 1)
 
     def _calc_log_determinant(self, s):
         """log det(diag( exp( s(x_{1:d}) ) )"""
@@ -117,7 +117,7 @@ class BijectiveTransform(nn.Module):
             cond_batch.size() == torch.Size([batch_size, self._condition_vector_size]), cond_batch.size()
 
         z, log_det_J = self.infer(x_batch, cond_batch)
-        log_pz = self._prior.log_prob(z).sum(dim=1)
+        log_pz = self._prior.log_prob(z)
         log_px = (log_pz + log_det_J).mean()
         return log_px
 
