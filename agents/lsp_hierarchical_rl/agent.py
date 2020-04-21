@@ -40,15 +40,14 @@ class LSPHierarchicalRL(Agent):
         self._prior = prior if prior is not None else MultivariateNormal(torch.zeros(self._action_size), torch.eye(self._action_size))
 
         self._subpolicy_coupling_layer_num = subpolicy_coupling_layer_num
-        self._subpolicies = []
 
         self._critic_hidden_layer_num = critic_hidden_layer_num
         self._critic_hidden_layer_size = critic_hidden_layer_size
 
         # Prepare a policy
         subpolicy = Policy(self._observation_size, self._action_size, 2, 128, action_low=action_space.low, action_high=action_space.high).to(self._device)
-        self._subpolicies.append(subpolicy)
-        self._policy_optim = Adam(subpolicy.parameters(), lr=self._learning_rate)
+        self._subpolicies = [subpolicy]
+        self._policy_optim = Adam(self._subpolicies[-1].parameters(), lr=self._learning_rate)
 
         # Prepare critic and its target
         self._critic = QNetwork(self._observation_size, self._action_size, critic_hidden_layer_num, critic_hidden_layer_size).to(self._device)
@@ -157,9 +156,10 @@ class LSPHierarchicalRL(Agent):
         # Calculate alpha loss
         alpha_loss = (self._log_alpha * (- log_ps_.detach() - self._target_entropy)).mean()
         
-        self._policy_optim.zero_grad()
-        policy_loss.backward()
-        self._policy_optim.step()
+        # TODO: uncomment
+        # self._policy_optim.zero_grad()
+        # policy_loss.backward()
+        # self._policy_optim.step()
 
         self._alpha_optim.zero_grad()
         alpha_loss.backward()
