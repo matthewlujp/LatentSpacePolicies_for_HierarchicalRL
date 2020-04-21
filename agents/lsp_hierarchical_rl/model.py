@@ -28,7 +28,7 @@ class NN(nn.Module):
 
         self._activation_func = activation_func
         self._output_func = output_func
-        self._output_scale = nn.Parameter(torch.tensor(1.0)) if learn_output_scale else None
+        self._output_scale = nn.Parameter(torch.tensor(1.0), requires_grad=True) if learn_output_scale else None
 
         self.apply(weights_init_)
 
@@ -152,8 +152,7 @@ class QNetwork(nn.Module):
 
 
 class Policy(nn.Module):
-    def __init__(self, obs_size, action_size, obs_embedding_hidden_layer_num=2, obs_embedding_hidden_layer_size=128,
-            action_low=None, action_high=None):
+    def __init__(self, obs_size, action_size, obs_embedding_hidden_layer_num=2, obs_embedding_hidden_layer_size=128, action_low=None, action_high=None):
         super().__init__()
         self._observation_size = obs_size
         self._action_size = action_size

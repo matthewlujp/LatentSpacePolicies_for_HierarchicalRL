@@ -37,7 +37,7 @@ class LSPHierarchicalRL(Agent):
         self._target_update_interval = target_update_interval
         self._learning_rate = learning_rate
 
-        self._prior = prior if prior is not None else MultivariateNormal(torch.ones(self._action_size), torch.eye(self._action_size))
+        self._prior = prior if prior is not None else MultivariateNormal(torch.zeros(self._action_size), torch.eye(self._action_size))
 
         self._subpolicy_coupling_layer_num = subpolicy_coupling_layer_num
         self._subpolicies = []
@@ -130,13 +130,22 @@ class LSPHierarchicalRL(Agent):
         with torch.no_grad():
             next_obs_hs, next_obs_hs_log_ps = self._select_latent_and_log_prob(next_observations)
             qf1_next_target, qf2_next_target = self._critic_target(next_observations, next_obs_hs)
-            min_qf_next_target = torch.min(qf1_next_target, qf2_next_target) - self._alpha * next_obs_hs_log_ps.unsqueeze(1)
+            # min_qf_next_target = torch.min(qf1_next_target, qf2_next_target) - self._alpha * next_obs_hs_log_ps.unsqueeze(1)
+            min_qf_next_target = torch.min(qf1_next_target, qf2_next_target)  # TODO: remove
             next_q_values = rewards + (1 - terminations) * self._gamma * (min_qf_next_target)
 
         # Calculate critic loss
         qf1, qf2 = self._critic(observations, hs)  # Two Q-functions to mitigate positive bias in the policy improvement step
         qf1_loss = F.mse_loss(qf1, next_q_values) # JQ = 𝔼(st,at)~D[0.5(Q1(st,at) - r(st,at) - γ(𝔼st+1~p[V(st+1)]))^2]
         qf2_loss = F.mse_loss(qf2, next_q_values) # JQ = 𝔼(st,at)~D[0.5(Q1(st,at) - r(st,at) - γ(𝔼st+1~p[V(st+1)]))^2]
+
+        self._critic_optim.zero_grad()
+        qf1_loss.backward()
+        self._critic_optim.step()
+
+        self._critic_optim.zero_grad()
+        qf2_loss.backward()
+        self._critic_optim.step()
 
         # Calculate subpolicy loss
         hs_, log_ps_ = self._select_latent_and_log_prob(observations)
@@ -147,14 +156,6 @@ class LSPHierarchicalRL(Agent):
 
         # Calculate alpha loss
         alpha_loss = (self._log_alpha * (- log_ps_.detach() - self._target_entropy)).mean()
-
-        self._critic_optim.zero_grad()
-        qf1_loss.backward()
-        self._critic_optim.step()
-
-        self._critic_optim.zero_grad()
-        qf2_loss.backward()
-        self._critic_optim.step()
         
         self._policy_optim.zero_grad()
         policy_loss.backward()
