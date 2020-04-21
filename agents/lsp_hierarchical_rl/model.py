@@ -222,7 +222,7 @@ class Scaler(nn.Module):
         Return
         ----
         a
-        log_det_J = log det diag{ w * (1 - tanh^2(u)) }
+        log_det_J = log det diag{ w * (1 - tanh^2(x)) }
         """
         u = torch.tanh(x)
         a = self._m + self._w * u
@@ -234,7 +234,7 @@ class Scaler(nn.Module):
         Return
         ---
         a
-        log_det_inv_J = - log det diag{ w * (1 - tanh^2(u)) }
+        log_det_inv_J = - log det diag{ w * (1 - tanh^2(x)) }
         """
         u = (a - self._m) / self._w
         x = _arctanh(u)

@@ -96,6 +96,7 @@ class LSPHierarchicalRL(Agent):
         N = obs.size(0)
         assert obs.size() == torch.Size([N, self._observation_size])
 
+        # Sample latent variable
         if not eval:
             hh = self._prior.sample((N, ))
             log_p_hh = self._prior.log_prob(hh).to(self._device)
@@ -107,6 +108,7 @@ class LSPHierarchicalRL(Agent):
         if skip_subpolicy:
             return hh, log_p_hh
 
+        # Select action in latent space
         h, log_det_J = self._subpolicies[-1](hh, obs)
         log_p = log_p_hh + log_det_J
         return h, log_p
@@ -140,7 +142,8 @@ class LSPHierarchicalRL(Agent):
         hs_, log_ps_ = self._select_latent_and_log_prob(observations)
         qf1_pi, qf2_pi = self._critic(observations, hs_)
         min_qf_pi = torch.min(qf1_pi, qf2_pi)
-        policy_loss = - (min_qf_pi - self._alpha * log_ps_).mean() # Jπ = 𝔼st∼D,εt∼N[α * logπ(f(εt;st)|st) − Q(st,f(εt;st))]
+        # policy_loss = - (min_qf_pi - self._alpha * log_ps_).mean() # Jπ = 𝔼st∼D,εt∼N[α * logπ(f(εt;st)|st) − Q(st,f(εt;st))]
+        policy_loss = - (min_qf_pi).mean()  # TODO: remove
 
         # Calculate alpha loss
         alpha_loss = (self._log_alpha * (- log_ps_.detach() - self._target_entropy)).mean()
