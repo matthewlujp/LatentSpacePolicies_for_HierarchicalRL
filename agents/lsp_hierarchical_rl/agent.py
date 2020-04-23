@@ -131,6 +131,7 @@ class LSPHierarchicalRL(Agent):
             qf1_next_target, qf2_next_target = self._critic_target(next_observations, next_obs_hs)
             min_qf_next_target = torch.min(qf1_next_target, qf2_next_target) - self._alpha * next_obs_hs_log_ps.unsqueeze(1)
             next_q_values = rewards + (1 - terminations) * self._gamma * (min_qf_next_target)
+        print("avg. reward", rewards.mean())
 
         # Calculate critic loss
         qf1, qf2 = self._critic(observations, hs)  # Two Q-functions to mitigate positive bias in the policy improvement step
