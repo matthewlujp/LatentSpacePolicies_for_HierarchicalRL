@@ -129,7 +129,8 @@ class LSPHierarchicalRL(Agent):
         with torch.no_grad():
             next_obs_hs, next_obs_hs_log_ps = self._select_latent_and_log_prob(next_observations)
             qf1_next_target, qf2_next_target = self._critic_target(next_observations, next_obs_hs)
-            min_qf_next_target = torch.min(qf1_next_target, qf2_next_target) - self._alpha * next_obs_hs_log_ps.unsqueeze(1)
+            # min_qf_next_target = torch.min(qf1_next_target, qf2_next_target) - self._alpha * next_obs_hs_log_ps.unsqueeze(1)
+            min_qf_next_target = torch.min(qf1_next_target, qf2_next_target) # TODO: remove
             next_q_values = rewards + (1 - terminations) * self._gamma * (min_qf_next_target)
 
         # Calculate critic loss
@@ -143,7 +144,8 @@ class LSPHierarchicalRL(Agent):
         hs_, log_ps_ = self._select_latent_and_log_prob(observations)
         qf1_pi, qf2_pi = self._critic(observations, hs_)
         min_qf_pi = torch.min(qf1_pi, qf2_pi)
-        policy_loss = - (min_qf_pi - self._alpha * log_ps_).mean() # Jπ = 𝔼st∼D,εt∼N[α * logπ(f(εt;st)|st) − Q(st,f(εt;st))]
+        # policy_loss = - (min_qf_pi - self._alpha * log_ps_).mean() # Jπ = 𝔼st∼D,εt∼N[α * logπ(f(εt;st)|st) − Q(st,f(εt;st))]
+        policy_loss = - (min_qf_pi).mean() # Jπ = 𝔼st∼D,εt∼N[α * logπ(f(εt;st)|st) − Q(st,f(εt;st))] TODO: remove
         print("avg. reward {:.1f},  avg. min_qf_pi {:.1f},  avg. log ps {:.1f}".format(
             rewards.mean().item(), min_qf_pi.mean().item(), log_ps_.mean().item()))
 
