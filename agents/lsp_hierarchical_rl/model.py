@@ -169,7 +169,9 @@ class Policy(nn.Module):
 
     def forward(self, hh, obs):
         """Return lower latent variable and log_det_J.
-        log p(h) = log p(hh) + log_det_J
+        h <- f(hh, obs)
+        log p(h)  = log p(hh) - log_det_J
+        log_det_J = log det df/dhh = - log det df^{-1}/dh
         """
         N = obs.size(0)
         assert hh.size() == torch.Size([N, self._action_size]), "expected {}, got {}".format((N, self._action_size), hh.size())
@@ -177,12 +179,12 @@ class Policy(nn.Module):
 
         log_det = 0
         obs_embedding = self._embed_nn(obs)
-        h, log_det_inv_J = self._f.generate(hh, obs_embedding)
-        log_det += (-log_det_inv_J)  # a <- f^{-1}(h), p(a) = p(h) det df/da = p(h) ( det df^{-1}/dh )^{-1}
+        h, log_det_inv_J = self._f.generate(hh, obs_embedding)  # h' <- f^{-1}(h)
+        log_det += log_det_inv_J
         # Convert range if needed
         if self._action_scaler:
-            h, log_det_scale = self._action_scaler(h)
-            log_det += (- log_det_scale)  # a <- f(u), p(a) = p(u) det df^{-1}/da = p(u) ( det df/du )^{-1}
+            h, log_det_scale = self._action_scaler(h)  # h <- scale(h')
+            log_det += log_det_scale
 
         return h, log_det
 

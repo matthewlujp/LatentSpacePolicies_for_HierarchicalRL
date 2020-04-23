@@ -74,8 +74,8 @@ class LSPHierarchicalRL(Agent):
     def post_process_action(self, obs: np.ndarray, h: np.ndarray):
         """Get an actual action from a latent variable.
         """
-        h = torch.FloatTensor(h).unsqueeze(0).to(self._device)
         obs = torch.FloatTensor(obs).unsqueeze(0).to(self._device)
+        h = torch.FloatTensor(h).unsqueeze(0).to(self._device)
         with torch.no_grad():
             for sp in reversed(self._subpolicies[:-1]):
                 h, _ = sp(h, obs)  # deterministic calculation
@@ -108,8 +108,8 @@ class LSPHierarchicalRL(Agent):
             return hh, log_p_hh
 
         # Select action in latent space
-        h, log_det_J = self._subpolicies[-1](hh, obs)
-        log_p = log_p_hh + log_det_J
+        h, log_det_J = self._subpolicies[-1](hh, obs)  # h <- sp(hh, obs)
+        log_p = log_p_hh - log_det_J  # log p(h) = log p(hh) + log det d(sp^{-1})/dh = log p(hh) - log det d(sp)/d(hh)
         return h, log_p
 
     def update_parameters(self, batch_data, total_updates):
@@ -137,6 +137,13 @@ class LSPHierarchicalRL(Agent):
         qf1_loss = F.mse_loss(qf1, next_q_values) # JQ = 𝔼(st,at)~D[0.5(Q1(st,at) - r(st,at) - γ(𝔼st+1~p[V(st+1)]))^2]
         qf2_loss = F.mse_loss(qf2, next_q_values) # JQ = 𝔼(st,at)~D[0.5(Q1(st,at) - r(st,at) - γ(𝔼st+1~p[V(st+1)]))^2]
 
+        # Calculate subpolicy loss
+        hs_, log_ps_ = self._select_latent_and_log_prob(observations)
+        qf1_pi, qf2_pi = self._critic(observations, hs_)
+        min_qf_pi = torch.min(qf1_pi, qf2_pi)
+        policy_loss = - (min_qf_pi - self._alpha * log_ps_).mean() # Jπ = 𝔼st∼D,εt∼N[α * logπ(f(εt;st)|st) − Q(st,f(εt;st))]
+        print("avg. min_qf_pi", min_qf_pi.mean().item(), "avg. log ps", log_ps_.mean().item())
+
         self._critic_optim.zero_grad()
         qf1_loss.backward()
         self._critic_optim.step()
@@ -145,18 +152,12 @@ class LSPHierarchicalRL(Agent):
         qf2_loss.backward()
         self._critic_optim.step()
 
-        # Calculate subpolicy loss
-        hs_, log_ps_ = self._select_latent_and_log_prob(observations)
-        qf1_pi, qf2_pi = self._critic(observations, hs_)
-        min_qf_pi = torch.min(qf1_pi, qf2_pi)
-        policy_loss = - (min_qf_pi - self._alpha * log_ps_).mean() # Jπ = 𝔼st∼D,εt∼N[α * logπ(f(εt;st)|st) − Q(st,f(εt;st))]
-
-        # Calculate alpha loss
-        alpha_loss = (self._log_alpha * (- log_ps_.detach() - self._target_entropy)).mean()
-        
         self._policy_optim.zero_grad()
         policy_loss.backward()
         self._policy_optim.step()
+
+        # Calculate alpha loss
+        alpha_loss = (self._log_alpha * (- log_ps_.detach() - self._target_entropy)).mean()
 
         self._alpha_optim.zero_grad()
         alpha_loss.backward()
@@ -180,7 +181,7 @@ class LSPHierarchicalRL(Agent):
         # Insert a new subpolicy
         new_subpolicy = Policy(self._observation_size, self._action_size, 2, 128).to(self._device)
         self._subpolicies.append(new_subpolicy)
-        self._policy_optim = Adam(new_subpolicy.parameters(), lr=self._learning_rate)
+        self._policy_optim = Adam(self._subpolicies[-1].parameters(), lr=self._learning_rate)
 
         # Prepare critic and its target
         self._critic = QNetwork(self._observation_size, self._action_size, self._critic_hidden_layer_num, self._critic_hidden_layer_size).to(self._device)
