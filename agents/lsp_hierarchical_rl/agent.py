@@ -136,8 +136,8 @@ class LSPHierarchicalRL(Agent):
         qf1, qf2 = self._critic(observations, hs)  # Two Q-functions to mitigate positive bias in the policy improvement step
         qf1_loss = F.mse_loss(qf1, next_q_values) # JQ = 𝔼(st,at)~D[0.5(Q1(st,at) - r(st,at) - γ(𝔼st+1~p[V(st+1)]))^2]
         qf2_loss = F.mse_loss(qf2, next_q_values) # JQ = 𝔼(st,at)~D[0.5(Q1(st,at) - r(st,at) - γ(𝔼st+1~p[V(st+1)]))^2]
-        print("avg. qf1 {:.1f},  avg. next q {:.1f},  avg. loss {:.1f}".format(
-            qf1.mean().item(), next_q_values.mean().item(), qf1_loss.mean().item()))
+        print("avg. qf1 {:.1f},  avg. next q {:.1f}, (avg. next q min {:.1f},  avg. next alpha log {:.1f}),  avg. loss {:.1f}".format(
+            qf1.mean().item(), next_q_values.mean().item(), torch.min(qf1_next_target, qf2_next_target).mean().item(), self._alpha * next_obs_hs_log_ps.mean().item(), qf1_loss.mean().item()))
 
         # Calculate subpolicy loss
         hs_, log_ps_ = self._select_latent_and_log_prob(observations)
@@ -157,8 +157,7 @@ class LSPHierarchicalRL(Agent):
 
         self._policy_optim.zero_grad()
         policy_loss.backward()
-        if len(self._subpolicies) < 2:  # TODO: remove
-            self._policy_optim.step()
+        self._policy_optim.step()
 
         # Calculate alpha loss
         alpha_loss = (self._log_alpha * (- log_ps_.detach() - self._target_entropy)).mean()
