@@ -10,7 +10,6 @@ import os
 from envs import make_env
 from utils import load_toml_config, create_save_dir, lineplot
 from memory import ReplayBuffer
-from replay_memory import ReplayMemory
 import agents
 
 
@@ -49,8 +48,7 @@ def train(config_filepath, save_dir, device, visualize_interval):
     env = make_env(conf.environment, render=False)
 
     # Instantiate modules
-    # memory = ReplayBuffer(int(conf.replay_buffer_capacity), env.observation_space.shape, env.action_space.shape)
-    memory = ReplayMemory(conf.replay_buffer_capacity)
+    memory = ReplayBuffer(int(conf.replay_buffer_capacity), env.observation_space.shape, env.action_space.shape)
     agent = getattr(agents, conf.agent_type)(env.observation_space, env.action_space, device=device, **conf.agent)
 
     # Load checkpoint if specified in config
@@ -194,7 +192,7 @@ def train(config_filepath, save_dir, device, visualize_interval):
 def evaluate(config_filepath: str, model_filepath: str, render: bool):
     conf = load_toml_config(config_filepath)
     env = make_env(conf.environment, render=render)
-    agent = getattr(agents, conf.agent_type)(env.observation_space.shape[0], env.action_space.shape[0], **conf.agent)
+    agent = getattr(agents, conf.agent_type)(env.observation_space, env.action_space, **conf.agent)
     ckpt = torch.load(model_filepath, map_location='cpu')
     agent.load_state_dict(ckpt['agent'])
 
