@@ -69,6 +69,8 @@ class LSPHierarchicalRL(Agent):
         obs = torch.FloatTensor(obs).unsqueeze(0).to(self._device)
         with torch.no_grad():
             h, _ = self._select_latent_and_log_prob(obs, eval=eval, skip_subpolicy=random)
+        if len(self._subpolicies) >= 2:
+            print("select action h", h.squeeze().detach.cpu().to_list())
         return h.squeeze(0).detach().cpu().numpy()
 
     def post_process_action(self, obs: np.ndarray, h: np.ndarray):
@@ -129,25 +131,24 @@ class LSPHierarchicalRL(Agent):
         with torch.no_grad():
             next_obs_hs, next_obs_hs_log_ps = self._select_latent_and_log_prob(next_observations)
             qf1_next_target, qf2_next_target = self._critic_target(next_observations, next_obs_hs)
-            # min_qf_next_target = torch.min(qf1_next_target, qf2_next_target) - self._alpha * next_obs_hs_log_ps.unsqueeze(1)
-            min_qf_next_target = torch.min(qf1_next_target, qf2_next_target) # TODO: remove
+            min_qf_next_target = torch.min(qf1_next_target, qf2_next_target) - self._alpha * next_obs_hs_log_ps.unsqueeze(1)
             next_q_values = rewards + (1 - terminations) * self._gamma * (min_qf_next_target)
 
         # Calculate critic loss
         qf1, qf2 = self._critic(observations, hs)  # Two Q-functions to mitigate positive bias in the policy improvement step
         qf1_loss = F.mse_loss(qf1, next_q_values) # JQ = 𝔼(st,at)~D[0.5(Q1(st,at) - r(st,at) - γ(𝔼st+1~p[V(st+1)]))^2]
         qf2_loss = F.mse_loss(qf2, next_q_values) # JQ = 𝔼(st,at)~D[0.5(Q1(st,at) - r(st,at) - γ(𝔼st+1~p[V(st+1)]))^2]
-        print("avg. qf1 {:.1f},  avg. next q {:.1f}, (avg. next q min {:.1f},  avg. next alpha log {:.1f}),  avg. loss {:.1f}".format(
-            qf1.mean().item(), next_q_values.mean().item(), torch.min(qf1_next_target, qf2_next_target).mean().item(), self._alpha * next_obs_hs_log_ps.mean().item(), qf1_loss.mean().item()))
+        # print("avg. qf1 {:.1f},  avg. next q {:.1f}, (avg. next q min {:.1f},  avg. next alpha log {:.1f}),  avg. loss {:.1f}".format(
+        #     qf1.mean().item(), next_q_values.mean().item(), torch.min(qf1_next_target, qf2_next_target).mean().item(),
+        #     self._alpha * next_obs_hs_log_ps.mean().item(), qf1_loss.mean().item()))
 
         # Calculate subpolicy loss
         hs_, log_ps_ = self._select_latent_and_log_prob(observations)
         qf1_pi, qf2_pi = self._critic(observations, hs_)
         min_qf_pi = torch.min(qf1_pi, qf2_pi)
-        # policy_loss = - (min_qf_pi - self._alpha * log_ps_).mean() # Jπ = 𝔼st∼D,εt∼N[α * logπ(f(εt;st)|st) − Q(st,f(εt;st))]
-        policy_loss = - (min_qf_pi).mean() # Jπ = 𝔼st∼D,εt∼N[α * logπ(f(εt;st)|st) − Q(st,f(εt;st))] TODO: remove
-        print("avg. reward {:.1f},  avg. min_qf_pi {:.1f},  avg. log ps {:.1f}".format(
-            rewards.mean().item(), min_qf_pi.mean().item(), log_ps_.mean().item()))
+        policy_loss = - (min_qf_pi - self._alpha * log_ps_).mean() # Jπ = 𝔼st∼D,εt∼N[α * logπ(f(εt;st)|st) − Q(st,f(εt;st))]
+        # print("avg. reward {:.1f},  avg. min_qf_pi {:.1f},  avg. log ps {:.1f}".format(
+        #     rewards.mean().item(), min_qf_pi.mean().item(), log_ps_.mean().item()))
 
         self._critic_optim.zero_grad()
         qf1_loss.backward()
