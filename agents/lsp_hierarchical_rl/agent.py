@@ -70,7 +70,7 @@ class LSPHierarchicalRL(Agent):
         with torch.no_grad():
             h, _ = self._select_latent_and_log_prob(obs, eval=eval, skip_subpolicy=random)
         if len(self._subpolicies) >= 2:
-            print("select action h", h.squeeze().detach.cpu().to_list())
+            print("select action h", h.squeeze().detach().cpu().to_list())
         return h.squeeze(0).detach().cpu().numpy()
 
     def post_process_action(self, obs: np.ndarray, h: np.ndarray):
