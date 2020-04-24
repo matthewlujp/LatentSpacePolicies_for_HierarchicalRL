@@ -162,7 +162,7 @@ class LSPHierarchicalRL(Agent):
 
         self._policy_optim.zero_grad()
         policy_loss.backward()
-        self._policy_optim.step()
+        # self._policy_optim.step()
 
         # Calculate alpha loss
         alpha_loss = (self._log_alpha * (- log_ps_.detach() - self._target_entropy)).mean()
