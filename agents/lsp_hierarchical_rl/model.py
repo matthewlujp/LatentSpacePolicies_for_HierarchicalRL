@@ -153,6 +153,8 @@ class QNetwork(nn.Module):
 
 class Policy(nn.Module):
     def __init__(self, obs_size, action_size, obs_embedding_hidden_layer_num=2, obs_embedding_hidden_layer_size=128, action_low=None, action_high=None):
+        DEFAULT_STD = 5.0
+
         super().__init__()
         self._observation_size = obs_size
         self._action_size = action_size
@@ -161,7 +163,8 @@ class Policy(nn.Module):
         if self._action_high is not None:
             self._action_scaler = Scaler(self._action_low, self._action_high)
         else:
-            self._action_scaler = None
+            # Limit to default std
+            self._action_scaler = Scaler(np.ones(self._action_size) * -DEFAULT_STD, np.ones(self._action_size) * DEFAULT_STD)
 
         obs_embedding_size = 2 * action_size
         self._f = BijectiveTransform(action_size, 2, 1, action_size, 1, action_size, obs_embedding_size) # following the configurations in the original paper
