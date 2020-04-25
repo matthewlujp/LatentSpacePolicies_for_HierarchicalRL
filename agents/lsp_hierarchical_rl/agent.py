@@ -76,9 +76,13 @@ class LSPHierarchicalRL(Agent):
         """
         obs = torch.FloatTensor(obs).unsqueeze(0).to(self._device)
         h = torch.FloatTensor(h).unsqueeze(0).to(self._device)
+        if len(self._subpolicies) >= 2:
+            print("h: " + ",  ".join(["{:.1f}".format(v) for v in h[0]]))
         with torch.no_grad():
             for sp in reversed(self._subpolicies[:-1]):
                 h, _ = sp(h, obs)  # deterministic calculation
+        if len(self._subpolicies) >= 2:
+            print("a: " + ",  ".join(["{:.1f}".format(v) for v in h[0]]))
         return h.squeeze(0).detach().cpu().numpy()
         
     def _select_latent_and_log_prob(self, obs: torch.FloatTensor, eval=False, skip_subpolicy=False):
@@ -162,7 +166,7 @@ class LSPHierarchicalRL(Agent):
 
         self._policy_optim.zero_grad()
         policy_loss.backward()
-        # self._policy_optim.step()
+        self._policy_optim.step()
 
         # Calculate alpha loss
         alpha_loss = (self._log_alpha * (- log_ps_.detach() - self._target_entropy)).mean()
