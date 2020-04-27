@@ -60,7 +60,8 @@ class BijectiveTransform(nn.Module):
         self._layer_num = layer_num
         m = torch.cat([torch.ones(v_size//2), torch.zeros(v_size - v_size//2)])
         self.register_buffer("_masks", torch.stack([m.clone() if i%2==0 else 1. - m.clone() for i in range(self._layer_num)]))
-        self._s = nn.ModuleList([NN(v_size + condition_vector_size, v_size, scale_net_hidden_layer_num, scale_net_hidden_layer_size, torch.relu, torch.tanh, True) for _ in range(layer_num)])
+        # self._s = nn.ModuleList([NN(v_size + condition_vector_size, v_size, scale_net_hidden_layer_num, scale_net_hidden_layer_size, torch.relu, torch.tanh, True) for _ in range(layer_num)])
+        self._s = nn.ModuleList([NN(v_size + condition_vector_size, v_size, scale_net_hidden_layer_num, scale_net_hidden_layer_size, torch.relu, torch.tanh, False) for _ in range(layer_num)])
         self._t = nn.ModuleList([NN(v_size + condition_vector_size, v_size, translate_net_hidden_layer_num, translate_net_hidden_layer_size, torch.relu) for _ in range(layer_num)])
         self._prior = MultivariateNormal(torch.zeros(v_size), torch.eye(v_size))  # N(0, 1)
 
@@ -161,9 +162,6 @@ class Policy(nn.Module):
         if self._action_high is not None:
             self._action_scaler = Scaler(self._action_low, self._action_high)
         else:
-            # Limit to default std
-            # DEFAULT_STD = 5.0
-            # self._action_scaler = Scaler(np.ones(self._action_size) * -DEFAULT_STD, np.ones(self._action_size) * DEFAULT_STD)
             self._action_scaler = None
 
         obs_embedding_size = 2 * action_size
