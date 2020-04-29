@@ -146,10 +146,10 @@ class LSPHierarchicalRL(Agent):
         # if len(self._subpolicies) >= 2:
         #     print("h SAMPLE:", hs[0].cpu().tolist())
 
-        if len(self._subpolicies) >= 2:
-            print("avg. qf1 {:.1f},  avg. next q {:.1f}, (avg. next q min {:.1f},  avg. next alpha log {:.1f}),  avg. loss {:.1f}".format(
-                qf1.mean().item(), next_q_values.mean().item(), torch.min(qf1_next_target, qf2_next_target).mean().item(),
-                self._alpha * next_obs_hs_log_ps.mean().item(), qf1_loss.mean().item()))
+        # if len(self._subpolicies) >= 2:
+        print("avg. qf1 {:.1f},  avg. next q {:.1f}, (avg. next q min {:.1f},  avg. next alpha log {:.1f}),  avg. loss {:.1f}".format(
+            qf1.mean().item(), next_q_values.mean().item(), torch.min(qf1_next_target, qf2_next_target).mean().item(),
+            self._alpha * next_obs_hs_log_ps.mean().item(), qf1_loss.mean().item()))
 
         # Calculate subpolicy loss
         hs_, log_ps_ = self._select_latent_and_log_prob(observations)
@@ -157,9 +157,9 @@ class LSPHierarchicalRL(Agent):
         min_qf_pi = torch.min(qf1_pi, qf2_pi)
         # policy_loss = - (min_qf_pi - self._alpha * log_ps_).mean() # Jπ = 𝔼st∼D,εt∼N[α * logπ(f(εt;st)|st) − Q(st,f(εt;st))]
         policy_loss = - (min_qf_pi).mean() # Jπ = 𝔼st∼D,εt∼N[α * logπ(f(εt;st)|st) − Q(st,f(εt;st))]
-        if len(self._subpolicies) >= 2:
-            print("avg. reward {:.1f},  avg. min_qf_pi {:.1f},  avg. log ps {:.1f}".format(
-                rewards.mean().item(), min_qf_pi.mean().item(), log_ps_.mean().item()))
+        # if len(self._subpolicies) >= 2:
+        print("avg. reward {:.1f},  avg. min_qf_pi {:.1f},  avg. log ps {:.1f}".format(
+            rewards.mean().item(), min_qf_pi.mean().item(), log_ps_.mean().item()))
 
         self._critic_optim.zero_grad()
         qf1_loss.backward()
