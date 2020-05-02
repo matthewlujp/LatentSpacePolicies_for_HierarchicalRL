@@ -93,8 +93,8 @@ def train(config_filepath, save_dir, device, visualize_interval):
         for t in range(conf.horizon):
             if total_collected_samples <= conf.random_sample_num:  # Select random actions at the begining of training.
                 h = env.action_space.sample()
-            # elif memory.step <= conf.random_sample_num:  # Select actions from random latent variable soon after inserting a new subpolicy.
-            #     h = agent.select_action(o, random=True)
+            elif memory.step <= conf.random_sample_num:  # Select actions from random latent variable soon after inserting a new subpolicy.
+                h = agent.select_action(o, random=True)
             else:
                 h = agent.select_action(o)
 

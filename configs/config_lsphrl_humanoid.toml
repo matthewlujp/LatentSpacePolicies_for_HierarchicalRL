@@ -1,15 +1,15 @@
-episodes = 10000
+episodes = 50000
 horizon = 1000
 environment = 'HumanoidBulletEnv'
 agent_type = 'LSPHierarchicalRL'
-replay_buffer_capacity = 10e4
+replay_buffer_capacity = 1e5
 random_sample_num = 1000
 agent_update_batch_size = 256
 checkpoint_interval = 10
 checkpoint = ''
-test_interval = 50
+test_interval = 100
 test_times = 5
-policy_switch_samples = [5e4]
+policy_switch_samples = [1.2e6]
 
 
 
