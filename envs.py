@@ -14,7 +14,7 @@ PYBULLET_ENVS_LOCOMOTION = ["Walker2DBulletEnv", "HalfCheetahBulletEnv", "AntBul
 def make_env(env_name, render=False):
     if env_name in PYBULLET_ENVS:
         from pybullet_envs import bullet
-        env = getattr(bullet, env_name)(render=render)
+        env = getattr(bullet, env_name)(renders=render)
         return env
 
     if env_name in PYBULLET_ENVS_DEEPMIMIC:
