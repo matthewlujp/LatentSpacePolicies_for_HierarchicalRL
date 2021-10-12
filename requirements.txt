@@ -3,7 +3,7 @@ pybullet==2.7.2
 tensorflow==2.1.0
 torch==1.1.0
 torchvision==0.4.0
-opencv-python==4.1.1.26
+opencv-python==4.2.0.32
 numpy
 plotly
 tqdm==4.45.0
